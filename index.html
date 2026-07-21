@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sorteador de Times</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts para tipografia moderna -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Sorteador de Times</h1>
+            <!-- Gerenciador de Elencos -->
+            <div class="squad-manager">
+                <select id="squad-select"></select>
+                <button id="btn-new-squad" class="btn-icon" title="Criar Elenco">＋</button>
+                <button id="btn-rename-squad" class="btn-icon" title="Renomear Elenco">✏️</button>
+                <button id="btn-delete-squad" class="btn-icon btn-icon-danger" title="Excluir Elenco">🗑️</button>
+            </div>
+        </header>
+
+        <!-- Navegação Principal -->
+        <nav class="app-nav">
+            <button id="nav-manage" class="nav-btn active">Elenco</button>
+            <button id="nav-draw" class="nav-btn">Sorteio</button>
+        </nav>
+
+        <main id="main-content">
+            <!-- ========== TELA 1: GERENCIAR ELENCO ========== -->
+            <div id="view-manage" class="view-section active">
+                <!-- Add Player Section -->
+                <section class="card add-player-section">
+                    <h2>Novo Jogador</h2>
+                    <div class="input-group">
+                        <input type="text" id="player-name" placeholder="Nome do jogador" autocomplete="off">
+                    </div>
+                    <div class="positions-row">
+                        <div class="input-group">
+                            <label for="add-pos-primary">Posição Principal</label>
+                            <select id="add-pos-primary">
+                                <option value="">— Nenhuma —</option>
+                                <option value="GOL">Goleiro</option>
+                                <option value="DEF">Defesa</option>
+                                <option value="MEI">Meio</option>
+                                <option value="ATA">Ataque</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="add-pos-secondary">Posição Alternativa</label>
+                            <select id="add-pos-secondary">
+                                <option value="">— Nenhuma —</option>
+                                <option value="GOL">Goleiro</option>
+                                <option value="DEF">Defesa</option>
+                                <option value="MEI">Meio</option>
+                                <option value="ATA">Ataque</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Nível de Habilidade (1 a 10)</label>
+                        <div class="star-rating" id="star-rating">
+                            <span class="star" data-value="1">★</span>
+                            <span class="star" data-value="2">★</span>
+                            <span class="star" data-value="3">★</span>
+                            <span class="star" data-value="4">★</span>
+                            <span class="star" data-value="5">★</span>
+                            <span class="star" data-value="6">★</span>
+                            <span class="star" data-value="7">★</span>
+                            <span class="star" data-value="8">★</span>
+                            <span class="star" data-value="9">★</span>
+                            <span class="star" data-value="10">★</span>
+                        </div>
+                        <span id="rating-display">Nível: 5</span>
+                    </div>
+                    <button id="btn-add-player" class="btn-primary">Adicionar ao Elenco</button>
+                </section>
+
+                <!-- Players List Section -->
+                <section class="card players-list-section">
+                    <div class="list-header">
+                        <h2>Elenco Geral (<span id="player-count">0</span>)</h2>
+                        <button id="btn-clear-all" class="btn-text">Limpar</button>
+                    </div>
+                    <div class="input-group" style="margin-top: 10px; margin-bottom: 10px;">
+                        <input type="text" id="search-manage" placeholder="Pesquisar jogador..." autocomplete="off">
+                    </div>
+                    <ul id="players-list" class="players-list">
+                        <!-- Players will be injected here -->
+                    </ul>
+                </section>
+            </div>
+
+            <!-- ========== TELA 2: CONFIGURAR E SORTEAR ========== -->
+            <div id="view-draw" class="view-section hidden">
+
+                <!-- PASSO 1: Seleção de jogadores -->
+                <div id="draw-step-1">
+                    <section class="card select-players-section">
+                        <div class="list-header">
+                            <h2>Quem vai jogar? (<span id="selected-count">0</span>)</h2>
+                            <button id="btn-select-all" class="btn-text" style="color: var(--primary-color);">Selecionar
+                                Todos</button>
+                        </div>
+                        <div class="input-group" style="margin-top: 10px; margin-bottom: 10px;">
+                            <input type="text" id="search-draw" placeholder="Pesquisar jogador..." autocomplete="off">
+                        </div>
+                        <ul id="select-players-list" class="players-list checklist">
+                            <!-- Checkboxes will be injected here -->
+                        </ul>
+                    </section>
+                    <button id="btn-advance-draw" class="btn-primary btn-large" style="margin-top: 5px;">Avançar
+                        →</button>
+                </div>
+
+                <!-- PASSO 2: Configuração + Sortear -->
+                <div id="draw-step-2" class="hidden">
+                    <section class="card draw-config-section">
+                        <div class="list-header" style="margin-bottom: 15px;">
+                            <h2>Configuração do Sorteio</h2>
+                            <button id="btn-back-draw" class="btn-text" style="color: var(--primary-color);">&#8592;
+                                Voltar</button>
+                        </div>
+
+                        <div class="input-group" id="group-num-teams">
+                            <label for="num-teams-input">Número de Times</label>
+                            <input type="number" id="num-teams-input" value="3" min="1" max="20">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="starters-limit">Titulares por Time</label>
+                            <input type="number" id="starters-limit" value="7" min="1" max="30">
+                        </div>
+
+                        <div class="input-group balance-option">
+                            <input type="checkbox" id="balance-positions" checked>
+                            <label for="balance-positions">Equilibrar também por posições</label>
+                        </div>
+
+                        <button id="btn-draw-teams" class="btn-primary btn-large draw-action-btn">Sortear Times</button>
+                    </section>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Result Modal/Overlay -->
+        <div id="result-overlay" class="overlay hidden">
+            <div class="result-modal">
+                <h2>Times Sorteados</h2>
+                <div id="teams-container" class="teams-container">
+                    <!-- Teams will be injected here -->
+                </div>
+
+                <div class="modal-actions">
+                    <button id="btn-copy-result" class="btn-primary">Copiar para Whatsapp</button>
+                    <button id="btn-close-result" class="btn-secondary">Voltar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Player Modal -->
+        <div id="edit-overlay" class="overlay hidden">
+            <div class="result-modal">
+                <h2>Editar Jogador</h2>
+                <div class="input-group">
+                    <input type="text" id="edit-player-name" placeholder="Nome do jogador" autocomplete="off">
+                </div>
+                <div class="positions-row">
+                    <div class="input-group">
+                        <label for="edit-pos-primary">Posição Principal</label>
+                        <select id="edit-pos-primary">
+                            <option value="">— Nenhuma —</option>
+                            <option value="GOL">Goleiro</option>
+                            <option value="DEF">Defesa</option>
+                            <option value="MEI">Meio</option>
+                            <option value="ATA">Ataque</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-pos-secondary">Posição Alternativa</label>
+                        <select id="edit-pos-secondary">
+                            <option value="">— Nenhuma —</option>
+                            <option value="GOL">Goleiro</option>
+                            <option value="DEF">Defesa</option>
+                            <option value="MEI">Meio</option>
+                            <option value="ATA">Ataque</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Nível de Habilidade (1 a 10)</label>
+                    <div class="star-rating" id="edit-star-rating">
+                        <span class="star" data-value="1">★</span>
+                        <span class="star" data-value="2">★</span>
+                        <span class="star" data-value="3">★</span>
+                        <span class="star" data-value="4">★</span>
+                        <span class="star" data-value="5">★</span>
+                        <span class="star" data-value="6">★</span>
+                        <span class="star" data-value="7">★</span>
+                        <span class="star" data-value="8">★</span>
+                        <span class="star" data-value="9">★</span>
+                        <span class="star" data-value="10">★</span>
+                    </div>
+                    <span id="edit-rating-display">Nível: 5</span>
+                </div>
+                <div class="modal-actions" style="flex-direction: row; gap: 10px;">
+                    <button id="btn-save-edit" class="btn-primary">Salvar</button>
+                    <button id="btn-cancel-edit" class="btn-secondary">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
+
+</html>
