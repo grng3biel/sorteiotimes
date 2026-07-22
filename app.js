@@ -752,4 +752,3 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPlayers();
     switchView('draw');
 });
-
