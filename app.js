@@ -1,3 +1,31 @@
+import { db } from "./firebase.js";
+import {
+    collection,
+    getDocs,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
+    setDoc
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+console.log("Firebase conectado!", db);
+
+// ===========================
+// Verificação de conexão (opcional, para debug)
+// ===========================
+async function testarFirebase() {
+    try {
+        const snapshot = await getDocs(collection(db, "teste"));
+        console.log("Conexão com Firestore OK!");
+        console.log(snapshot.size);
+    } catch (erro) {
+        console.error("Erro ao conectar:", erro);
+    }
+}
+
+testarFirebase();
+
 document.addEventListener('DOMContentLoaded', () => {
     // ===========================
     // DOM Elements
@@ -75,72 +103,193 @@ document.addEventListener('DOMContentLoaded', () => {
     let fillerIndex = 0; // ponteiro para o próximo filler disponível
 
     // ===========================
-    // Squad Management
+    // Squad Management (Firestore)
     // ===========================
-    const SQUADS_KEY = 'sorteador_squads';
-    const ACTIVE_SQUAD_KEY = 'sorteador_active_squad';
-
-    function getSquads() {
-        return JSON.parse(localStorage.getItem(SQUADS_KEY)) || [];
-    }
-
-    function saveSquads(squads) {
-        localStorage.setItem(SQUADS_KEY, JSON.stringify(squads));
-    }
 
     function getActiveSquadId() {
-        return localStorage.getItem(ACTIVE_SQUAD_KEY);
+        return localStorage.getItem('sorteador_active_squad');
     }
 
     function setActiveSquadId(id) {
-        localStorage.setItem(ACTIVE_SQUAD_KEY, id);
+        localStorage.setItem('sorteador_active_squad', id);
     }
 
-    function getPlayersKey(squadId) {
-        return `sorteador_players_${squadId}`;
+    // ===========================
+    // Load Squads from Firestore
+    // ===========================
+    async function loadSquadsFromFirestore() {
+        try {
+            const snapshot = await getDocs(collection(db, "squads"));
+            const squads = [];
+            snapshot.forEach(docSnap => {
+                squads.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            return squads;
+        } catch (erro) {
+            console.error("Erro ao carregar elencos:", erro);
+            return [];
+        }
     }
 
-    function loadPlayers(squadId) {
-        const raw = JSON.parse(localStorage.getItem(getPlayersKey(squadId))) || [];
-        // Migrate old format
-        return raw.map(p => {
-            if (p.selected === undefined) p.selected = true;
-            // Migrate old positions array to {primary, secondary}
-            if (Array.isArray(p.positions)) {
-                p.primaryPos = p.positions[0] || '';
-                p.secondaryPos = p.positions[1] || '';
-                delete p.positions;
+    // ===========================
+    // Load Players from Firestore
+    // ===========================
+    async function loadPlayersFromFirestore(squadId) {
+        try {
+            const snapshot = await getDocs(collection(db, "players"));
+            const allPlayers = [];
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.squadId === squadId) {
+                    allPlayers.push({ id: parseInt(docSnap.id), ...data });
+                }
+            });
+            return allPlayers;
+        } catch (erro) {
+            console.error("Erro ao carregar jogadores:", erro);
+            return [];
+        }
+    }
+
+    // ===========================
+    // Save Player to Firestore
+    // ===========================
+    async function savePlayerToFirestore(player) {
+        try {
+            await setDoc(doc(db, "players", player.id.toString()), {
+                squadId: getActiveSquadId(),
+                name: player.name,
+                rating: player.rating,
+                selected: player.selected,
+                primaryPos: player.primaryPos || '',
+                secondaryPos: player.secondaryPos || ''
+            });
+        } catch (erro) {
+            console.error("Erro ao salvar jogador:", erro);
+        }
+    }
+
+    // ===========================
+    // Delete Player from Firestore
+    // ===========================
+    async function deletePlayerFromFirestore(id) {
+        try {
+            await deleteDoc(doc(db, "players", id.toString()));
+        } catch (erro) {
+            console.error("Erro ao excluir jogador:", erro);
+        }
+    }
+
+    // ===========================
+    // Delete All Players of a Squad from Firestore
+    // ===========================
+    async function deleteAllPlayersOfSquad(squadId) {
+        try {
+            const snapshot = await getDocs(collection(db, "players"));
+            const deletePromises = [];
+            snapshot.forEach(docSnap => {
+                if (docSnap.data().squadId === squadId) {
+                    deletePromises.push(deleteDoc(docSnap.ref));
+                }
+            });
+            await Promise.all(deletePromises);
+        } catch (erro) {
+            console.error("Erro ao limpar jogadores:", erro);
+        }
+    }
+
+    // ===========================
+    // Save Squad to Firestore
+    // ===========================
+    async function saveSquadToFirestore(squad) {
+        try {
+            await setDoc(doc(db, "squads", squad.id), { name: squad.name });
+        } catch (erro) {
+            console.error("Erro ao salvar elenco:", erro);
+        }
+    }
+
+    // ===========================
+    // Delete Squad from Firestore
+    // ===========================
+    async function deleteSquadFromFirestore(squadId) {
+        try {
+            await deleteDoc(doc(db, "squads", squadId));
+        } catch (erro) {
+            console.error("Erro ao excluir elenco:", erro);
+        }
+    }
+
+    // ===========================
+    // Init Squads (migrates from localStorage if needed)
+    // ===========================
+    async function initSquads() {
+        let squads = await loadSquadsFromFirestore();
+
+        // Migrate legacy localStorage data to Firestore
+        const legacySquadsRaw = localStorage.getItem('sorteador_squads');
+        if (legacySquadsRaw && squads.length === 0) {
+            const legacySquads = JSON.parse(legacySquadsRaw);
+            // Migrate each squad
+            for (const squad of legacySquads) {
+                await saveSquadToFirestore(squad);
+                // Migrate players for this squad
+                const legacyPlayersKey = `sorteador_players_${squad.id}`;
+                const legacyPlayersRaw = localStorage.getItem(legacyPlayersKey);
+                if (legacyPlayersRaw) {
+                    const legacyPlayers = JSON.parse(legacyPlayersRaw);
+                    for (const p of legacyPlayers) {
+                        // Migrate old format
+                        if (p.selected === undefined) p.selected = true;
+                        if (Array.isArray(p.positions)) {
+                            p.primaryPos = p.positions[0] || '';
+                            p.secondaryPos = p.positions[1] || '';
+                            delete p.positions;
+                        }
+                        if (p.primaryPos === undefined) p.primaryPos = '';
+                        if (p.secondaryPos === undefined) p.secondaryPos = '';
+                        await savePlayerToFirestore({ ...p, squadId: squad.id });
+                    }
+                }
             }
-            if (p.primaryPos === undefined) p.primaryPos = '';
-            if (p.secondaryPos === undefined) p.secondaryPos = '';
-            return p;
-        });
-    }
+            localStorage.removeItem('sorteador_squads');
+            // Remove all player keys
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+                if (key.startsWith('sorteador_players_')) {
+                    localStorage.removeItem(key);
+                }
+            });
+            squads = await loadSquadsFromFirestore();
+        }
 
-    function savePlayers() {
-        const id = getActiveSquadId();
-        localStorage.setItem(getPlayersKey(id), JSON.stringify(players));
-    }
-
-    function initSquads() {
-        let squads = getSquads();
-
-        // Migrate legacy players (saved without squads)
+        // Check for old legacy single-player list
         const legacyPlayers = localStorage.getItem('sorteador_jogadores');
         if (legacyPlayers && squads.length === 0) {
             const firstId = Date.now().toString();
-            squads = [{ id: firstId, name: 'Elenco Principal' }];
-            saveSquads(squads);
-            localStorage.setItem(getPlayersKey(firstId), legacyPlayers);
+            const firstSquad = { id: firstId, name: 'Elenco Principal' };
+            await saveSquadToFirestore(firstSquad);
+            const oldPlayers = JSON.parse(legacyPlayers);
+            for (const p of oldPlayers) {
+                if (p.selected === undefined) p.selected = true;
+                if (Array.isArray(p.positions)) {
+                    p.primaryPos = p.positions[0] || '';
+                    p.secondaryPos = p.positions[1] || '';
+                    delete p.positions;
+                }
+                if (p.primaryPos === undefined) p.primaryPos = '';
+                if (p.secondaryPos === undefined) p.secondaryPos = '';
+                await savePlayerToFirestore({ ...p, squadId: firstId });
+            }
             localStorage.removeItem('sorteador_jogadores');
-            setActiveSquadId(firstId);
+            squads = await loadSquadsFromFirestore();
         }
 
         if (squads.length === 0) {
             const firstId = Date.now().toString();
-            squads = [{ id: firstId, name: 'Elenco Principal' }];
-            saveSquads(squads);
-            setActiveSquadId(firstId);
+            const firstSquad = { id: firstId, name: 'Elenco Principal' };
+            await saveSquadToFirestore(firstSquad);
+            squads = [firstSquad];
         }
 
         let activeId = getActiveSquadId();
@@ -150,21 +299,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderSquadSelect(squads, activeId);
-        players = loadPlayers(activeId);
+        players = await loadPlayersFromFirestore(activeId);
 
         // Seed dummy players if empty
         if (players.length === 0) {
             for (let i = 1; i <= 21; i++) {
-                players.push({
+                const player = {
                     id: Date.now() + i,
                     name: `Jogador Teste ${i}`,
                     rating: Math.floor(Math.random() * 10) + 1,
                     selected: true,
                     primaryPos: '',
                     secondaryPos: ''
-                });
+                };
+                players.push(player);
+                await savePlayerToFirestore(player);
             }
-            savePlayers();
         }
     }
 
@@ -179,56 +329,56 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    squadSelect.addEventListener('change', () => {
+    squadSelect.addEventListener('change', async () => {
         const newId = squadSelect.value;
         setActiveSquadId(newId);
-        players = loadPlayers(newId);
+        players = await loadPlayersFromFirestore(newId);
         renderPlayers(searchManage.value);
         renderSelectPlayersList(searchDraw.value);
     });
 
-    btnNewSquad.addEventListener('click', () => {
+    btnNewSquad.addEventListener('click', async () => {
         const name = prompt('Nome do novo elenco:');
         if (!name || !name.trim()) return;
-        const squads = getSquads();
         const newId = Date.now().toString();
-        squads.push({ id: newId, name: name.trim() });
-        saveSquads(squads);
+        const newSquad = { id: newId, name: name.trim() };
+        await saveSquadToFirestore(newSquad);
         setActiveSquadId(newId);
         players = [];
-        savePlayers();
+        const squads = await loadSquadsFromFirestore();
         renderSquadSelect(squads, newId);
         renderPlayers();
         renderSelectPlayersList();
     });
 
-    btnRenameSquad.addEventListener('click', () => {
+    btnRenameSquad.addEventListener('click', async () => {
         const activeId = getActiveSquadId();
-        const squads = getSquads();
+        const squads = await loadSquadsFromFirestore();
         const squad = squads.find(s => s.id === activeId);
         if (!squad) return;
         const newName = prompt('Novo nome para o elenco:', squad.name);
         if (!newName || !newName.trim()) return;
         squad.name = newName.trim();
-        saveSquads(squads);
+        await saveSquadToFirestore(squad);
         renderSquadSelect(squads, activeId);
     });
 
-    btnDeleteSquad.addEventListener('click', () => {
-        const squads = getSquads();
+    btnDeleteSquad.addEventListener('click', async () => {
+        const squads = await loadSquadsFromFirestore();
         if (squads.length <= 1) {
             alert('Você precisa ter ao menos um elenco!');
             return;
         }
         const activeId = getActiveSquadId();
         const squad = squads.find(s => s.id === activeId);
+        if (!squad) return;
         if (!confirm(`Excluir o elenco "${squad.name}" e todos os seus jogadores? Esta ação não pode ser desfeita.`)) return;
-        localStorage.removeItem(getPlayersKey(activeId));
+        await deleteAllPlayersOfSquad(activeId);
+        await deleteSquadFromFirestore(activeId);
         const newSquads = squads.filter(s => s.id !== activeId);
-        saveSquads(newSquads);
         const newActiveId = newSquads[0].id;
         setActiveSquadId(newActiveId);
-        players = loadPlayers(newActiveId);
+        players = await loadPlayersFromFirestore(newActiveId);
         renderSquadSelect(newSquads, newActiveId);
         renderPlayers();
         renderSelectPlayersList();
@@ -257,13 +407,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     navManage.addEventListener('click', () => {
-    const pwd = prompt('Digite a senha para acessar o elenco:');
-    if (pwd !== '010203') {
-        alert('Senha incorreta.');
-        return;
-    }
-    switchView('manage');
-});
+        const pwd = prompt('Digite a senha para acessar o elenco:');
+        if (pwd !== '010203') {
+            alert('Senha incorreta.');
+            return;
+        }
+        switchView('manage');
+    });
     navDraw.addEventListener('click', () => switchView('draw'));
 
     // Navegação interna do Sorteio
@@ -308,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnAddPlayer.addEventListener('click', addPlayer);
     playerNameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addPlayer(); });
 
-    function addPlayer() {
+    async function addPlayer() {
         const name = playerNameInput.value.trim();
         if (!name) return;
         if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
@@ -321,8 +471,16 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Posição Principal e Alternativa não podem ser iguais!');
             return;
         }
-        players.push({ id: Date.now(), name, rating: currentRating, selected: true, primaryPos: primary, secondaryPos: secondary });
-        savePlayers();
+        const newPlayer = {
+            id: Date.now(),
+            name,
+            rating: currentRating,
+            selected: true,
+            primaryPos: primary,
+            secondaryPos: secondary
+        };
+        players.push(newPlayer);
+        await savePlayerToFirestore(newPlayer);
         renderPlayers(searchManage.value);
         playerNameInput.value = '';
         addPosPrimary.value = '';
@@ -347,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnCancelEdit.addEventListener('click', () => { editOverlay.classList.add('hidden'); editingPlayerId = null; });
 
-    btnSaveEdit.addEventListener('click', () => {
+    btnSaveEdit.addEventListener('click', async () => {
         const newName = editPlayerName.value.trim();
         if (!newName) return;
         if (players.some(p => p.name.toLowerCase() === newName.toLowerCase() && p.id !== editingPlayerId)) {
@@ -366,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
             player.rating = editCurrentRating;
             player.primaryPos = primary;
             player.secondaryPos = secondary;
-            savePlayers();
+            await savePlayerToFirestore(player);
             renderPlayers(searchManage.value);
             if (!viewDraw.classList.contains('hidden')) renderSelectPlayersList(searchDraw.value);
         }
@@ -377,17 +535,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===========================
     // Delete / Clear
     // ===========================
-    function deletePlayer(id) {
+    async function deletePlayer(id) {
         players = players.filter(p => p.id !== id);
-        savePlayers();
+        await deletePlayerFromFirestore(id);
         renderPlayers(searchManage.value);
         if (!viewDraw.classList.contains('hidden')) renderSelectPlayersList(searchDraw.value);
     }
 
-    btnClearAll.addEventListener('click', () => {
+    btnClearAll.addEventListener('click', async () => {
         if (confirm('Remover todos os jogadores deste elenco?')) {
             players = [];
-            savePlayers();
+            await deleteAllPlayersOfSquad(getActiveSquadId());
             renderPlayers();
             if (!viewDraw.classList.contains('hidden')) renderSelectPlayersList();
         }
@@ -492,24 +650,26 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCountSpan.textContent = players.filter(p => p.selected).length;
 
         selectPlayersListUl.querySelectorAll('input[type="checkbox"]').forEach(chk => {
-            chk.addEventListener('change', (e) => {
+            chk.addEventListener('change', async (e) => {
                 const id = parseInt(e.target.getAttribute('data-id'));
                 const player = players.find(p => p.id === id);
                 if (player) {
                     player.selected = e.target.checked;
-                    savePlayers();
+                    await savePlayerToFirestore(player);
                     selectedCountSpan.textContent = players.filter(p => p.selected).length;
                 }
             });
         });
     }
 
-    btnSelectAll.addEventListener('click', () => {
+    btnSelectAll.addEventListener('click', async () => {
         const filter = searchDraw.value;
         const target = filter ? players.filter(p => p.name.toLowerCase().includes(filter.toLowerCase())) : players;
         const allSelected = target.every(p => p.selected);
         target.forEach(p => p.selected = !allSelected);
-        savePlayers();
+        // Salvar todos de uma vez no Firestore
+        const promises = target.map(p => savePlayerToFirestore(p));
+        await Promise.all(promises);
         renderSelectPlayersList(filter);
     });
 
@@ -748,7 +908,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Init
     // ===========================
     showPositions = balancePositionsCheck.checked;
-    initSquads();
-    renderPlayers();
-    switchView('draw');
+    initSquads().then(() => {
+        renderPlayers();
+        switchView('draw');
+    });
 });
