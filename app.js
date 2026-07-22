@@ -8,7 +8,7 @@ import { getDatabase, ref, set, onValue } from "https://gstatic.com";
 const firebaseConfig = {
   apiKey: "AIzaSyDG18Mso3FlacBWhUtEqMvEwpqvIvIeNdM",
   authDomain: "://firebaseapp.com",
-  databaseURL: "https://firebaseio.com",
+  databaseURL: "https://sorteadordetimes-6f78a-default-rtdb.firebaseio.com/",
   projectId: "sorteadordetimes-6f78a",
   storageBucket: "://appspot.com",
   messagingSenderId: "1006706049499",
