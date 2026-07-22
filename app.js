@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'filler-3', name: 'Completar Time (3)', rating: 5, selected: false, primaryPos: 'GER', secondaryPos: '', isFiller: true },
         { id: 'filler-4', name: 'Completar Time (4)', rating: 5, selected: false, primaryPos: 'GER', secondaryPos: '', isFiller: true },
     ];
-    let fillerIndex = 0; // ponteiro para o próximo filler disponível
+    let fillerIndex = 0;
 
     // ===========================
     // Squad Management (Firestore)
@@ -114,9 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('sorteador_active_squad', id);
     }
 
-    // ===========================
-    // Load Squads from Firestore
-    // ===========================
     async function loadSquadsFromFirestore() {
         try {
             const snapshot = await getDocs(collection(db, "squads"));
@@ -131,9 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===========================
-    // Load Players from Firestore
-    // ===========================
     async function loadPlayersFromFirestore(squadId) {
         try {
             const snapshot = await getDocs(collection(db, "players"));
@@ -151,9 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===========================
-    // Save Player to Firestore
-    // ===========================
     async function savePlayerToFirestore(player) {
         try {
             await setDoc(doc(db, "players", player.id.toString()), {
@@ -169,9 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===========================
-    // Delete Player from Firestore
-    // ===========================
     async function deletePlayerFromFirestore(id) {
         try {
             await deleteDoc(doc(db, "players", id.toString()));
@@ -180,9 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===========================
-    // Delete All Players of a Squad from Firestore
-    // ===========================
     async function deleteAllPlayersOfSquad(squadId) {
         try {
             const snapshot = await getDocs(collection(db, "players"));
@@ -198,9 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===========================
-    // Save Squad to Firestore
-    // ===========================
     async function saveSquadToFirestore(squad) {
         try {
             await setDoc(doc(db, "squads", squad.id), { name: squad.name });
@@ -209,9 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===========================
-    // Delete Squad from Firestore
-    // ===========================
     async function deleteSquadFromFirestore(squadId) {
         try {
             await deleteDoc(doc(db, "squads", squadId));
@@ -220,26 +199,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===========================
-    // Init Squads (migrates from localStorage if needed)
-    // ===========================
     async function initSquads() {
         let squads = await loadSquadsFromFirestore();
 
-        // Migrate legacy localStorage data to Firestore
         const legacySquadsRaw = localStorage.getItem('sorteador_squads');
         if (legacySquadsRaw && squads.length === 0) {
             const legacySquads = JSON.parse(legacySquadsRaw);
-            // Migrate each squad
             for (const squad of legacySquads) {
                 await saveSquadToFirestore(squad);
-                // Migrate players for this squad
                 const legacyPlayersKey = `sorteador_players_${squad.id}`;
                 const legacyPlayersRaw = localStorage.getItem(legacyPlayersKey);
                 if (legacyPlayersRaw) {
                     const legacyPlayers = JSON.parse(legacyPlayersRaw);
                     for (const p of legacyPlayers) {
-                        // Migrate old format
                         if (p.selected === undefined) p.selected = true;
                         if (Array.isArray(p.positions)) {
                             p.primaryPos = p.positions[0] || '';
@@ -253,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             localStorage.removeItem('sorteador_squads');
-            // Remove all player keys
             const keys = Object.keys(localStorage);
             keys.forEach(key => {
                 if (key.startsWith('sorteador_players_')) {
@@ -263,7 +234,6 @@ document.addEventListener('DOMContentLoaded', () => {
             squads = await loadSquadsFromFirestore();
         }
 
-        // Check for old legacy single-player list
         const legacyPlayers = localStorage.getItem('sorteador_jogadores');
         if (legacyPlayers && squads.length === 0) {
             const firstId = Date.now().toString();
@@ -301,7 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSquadSelect(squads, activeId);
         players = await loadPlayersFromFirestore(activeId);
 
-        // Seed dummy players if empty
         if (players.length === 0) {
             for (let i = 1; i <= 21; i++) {
                 const player = {
@@ -351,14 +320,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSelectPlayersList();
     });
 
-   btnRenameSquad.addEventListener('click', async () => {
-    const pwd = prompt('Digite a senha para acessar o elenco:');
-    if (pwd !== '010203') {
-        alert('Senha incorreta.');
-        return;
-    }
-    const activeId = getActiveSquadId();
-    const squads = await loadSquadsFromFirestore();
+    btnRenameSquad.addEventListener('click', async () => {
+        const pwd = prompt('Digite a senha para acessar o elenco:');
+        if (pwd !== '010203') {
+            alert('Senha incorreta.');
+            return;
+        }
+        const activeId = getActiveSquadId();
+        const squads = await loadSquadsFromFirestore();
         const squad = squads.find(s => s.id === activeId);
         if (!squad) return;
         const newName = prompt('Novo nome para o elenco:', squad.name);
@@ -368,13 +337,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSquadSelect(squads, activeId);
     });
 
-   btnDeleteSquad.addEventListener('click', async () => {
-    const pwd = prompt('Digite a senha para acessar o elenco:');
-    if (pwd !== '010203') {
-        alert('Senha incorreta.');
-        return;
-    }
-    const squads = await loadSquadsFromFirestore();
+    btnDeleteSquad.addEventListener('click', async () => {
+        const pwd = prompt('Digite a senha para acessar o elenco:');
+        if (pwd !== '010203') {
+            alert('Senha incorreta.');
+            return;
+        }
+        const squads = await loadSquadsFromFirestore();
         if (squads.length <= 1) {
             alert('Você precisa ter ao menos um elenco!');
             return;
@@ -409,7 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
             navManage.classList.remove('active');
             viewDraw.classList.remove('hidden');
             viewManage.classList.add('hidden');
-            // Sempre começa no passo 1 ao entrar na aba
             drawStep1.classList.remove('hidden');
             drawStep2.classList.add('hidden');
             renderSelectPlayersList(searchDraw.value);
@@ -426,7 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     navDraw.addEventListener('click', () => switchView('draw'));
 
-    // Navegação interna do Sorteio
     btnAdvanceDraw.addEventListener('click', () => {
         drawStep1.classList.add('hidden');
         drawStep2.classList.remove('hidden');
@@ -562,28 +529,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ===========================
-    // Search
+    // Search & Display Helpers
     // ===========================
     searchManage.addEventListener('input', (e) => renderPlayers(e.target.value));
     searchDraw.addEventListener('input', (e) => renderSelectPlayersList(e.target.value));
 
-    // When balance-positions checkbox changes, re-render lists to show/hide position tags
     balancePositionsCheck.addEventListener('change', () => {
         showPositions = balancePositionsCheck.checked;
         renderPlayers(searchManage.value);
         renderSelectPlayersList(searchDraw.value);
     });
 
-    // ===========================
-    // Position Helpers
-    // ===========================
     const POS_PRIORITY = { 'GOL': 1, 'DEF': 2, 'MEI': 3, 'ATA': 4, 'GER': 5 };
+
+    function isGoleiro(player) {
+        return player.primaryPos === 'GOL' || player.secondaryPos === 'GOL';
+    }
 
     function getEffectivePrimaryPriority(player) {
         return POS_PRIORITY[player.primaryPos] || 5;
-    }
-    function getEffectiveSecondaryPriority(player) {
-        return POS_PRIORITY[player.secondaryPos] || 5;
     }
 
     function getPositionsHtml(player) {
@@ -603,6 +567,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (player.secondaryPos) parts.push(player.secondaryPos);
         if (parts.length === 0) return '';
         return `[${parts.join(', ')}]`;
+    }
+
+    // Função de Embaralhar (Fisher-Yates) para garantir aleatoriedade no sorteio
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
 
     // ===========================
@@ -677,14 +650,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = filter ? players.filter(p => p.name.toLowerCase().includes(filter.toLowerCase())) : players;
         const allSelected = target.every(p => p.selected);
         target.forEach(p => p.selected = !allSelected);
-        // Salvar todos de uma vez no Firestore
         const promises = target.map(p => savePlayerToFirestore(p));
         await Promise.all(promises);
         renderSelectPlayersList(filter);
     });
 
     // ===========================
-    // Draw Algorithm
+    // Draw Algorithm (Corrigido)
     // ===========================
     btnDrawTeams.addEventListener('click', () => {
         const selected = players.filter(p => p.selected);
@@ -700,129 +672,120 @@ document.addEventListener('DOMContentLoaded', () => {
         const usePositional = balancePositionsCheck.checked;
         const totalStarterSlots = numTeams * limit;
 
+        // Embaralhar seleção inicial para não viciar resultados
+        let pool = shuffleArray([...selected]);
+
         let startersPool = [];
         let reservesPool = [];
 
-        if (selected.length > totalStarterSlots) {
-            const numReserves = selected.length - totalStarterSlots;
-
-            if (usePositional) {
-                // Count how many of each primary position we have
-                const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-                selected.forEach(p => counts[getEffectivePrimaryPriority(p)]++);
-
-                // Minimum titulares needed per primary-pos priority to cover all teams
-                const minRequired = {};
-                for (let k in counts) minRequired[k] = Math.min(numTeams, counts[k]);
-
-                const currentCounts = { ...counts };
-                const shuffled = [...selected].sort(() => 0.5 - Math.random());
-
-                shuffled.forEach(p => {
-                    if (reservesPool.length < numReserves) {
-                        const prio = getEffectivePrimaryPriority(p);
-                        if (currentCounts[prio] - 1 >= minRequired[prio]) {
-                            reservesPool.push(p);
-                            currentCounts[prio]--;
-                        } else {
-                            startersPool.push(p);
-                        }
-                    } else {
-                        startersPool.push(p);
-                    }
-                });
-
-                // Safety fallback
-                if (reservesPool.length < numReserves) {
-                    startersPool.sort((a, b) => getEffectivePrimaryPriority(b) - getEffectivePrimaryPriority(a));
-                    while (reservesPool.length < numReserves) reservesPool.push(startersPool.pop());
-                }
-            } else {
-                const shuffled = [...selected].sort(() => 0.5 - Math.random());
-                reservesPool = shuffled.slice(0, numReserves);
-                startersPool = shuffled.slice(numReserves);
-            }
+        // Separação de Titulares e Reservas
+        if (pool.length > totalStarterSlots) {
+            const numReserves = pool.length - totalStarterSlots;
+            reservesPool = pool.slice(0, numReserves);
+            startersPool = pool.slice(numReserves);
         } else {
-            startersPool = [...selected];
+            startersPool = [...pool];
         }
 
         const teams = Array.from({ length: numTeams }, () => ({
             starters: [], reserves: [], totalStarterScore: 0, totalReserveScore: 0
         }));
 
-        // Sort function for pools
-        function sortPool(pool) {
-            if (usePositional) {
-                pool.sort((a, b) => {
-                    const pA = getEffectivePrimaryPriority(a);
-                    const pB = getEffectivePrimaryPriority(b);
-                    if (pA !== pB) return pA - pB;
-                    return b.rating - a.rating;
-                });
-            } else {
-                pool.sort((a, b) => b.rating - a.rating);
-            }
-        }
+        // Função para encontrar o time que precisa de jogador
+        function findWeakestTeamForStarter(teamsArr) {
+            let candidates = [];
+            let minCount = Infinity;
 
-        // Helper: find weakest team by quantity first, then score
-        function findWeakestTeamByCount(teamsArr, key, scoreKey) {
-            let target = teamsArr[0];
-            for (let i = 1; i < teamsArr.length; i++) {
-                if (teamsArr[i][key].length < target[key].length) {
-                    target = teamsArr[i];
-                } else if (teamsArr[i][key].length === target[key].length) {
-                    if (teamsArr[i][scoreKey] < target[scoreKey]) target = teamsArr[i];
+            // Pega os times com menor número de titulares
+            teamsArr.forEach(t => {
+                if (t.starters.length < minCount) {
+                    minCount = t.starters.length;
+                    candidates = [t];
+                } else if (t.starters.length === minCount) {
+                    candidates.push(t);
                 }
-            }
-            return target;
+            });
+
+            // Entre eles, pega o de menor pontuação de força
+            let minScore = Infinity;
+            let finalCandidates = [];
+            candidates.forEach(t => {
+                if (t.totalStarterScore < minScore) {
+                    minScore = t.totalStarterScore;
+                    finalCandidates = [t];
+                } else if (t.totalStarterScore === minScore) {
+                    finalCandidates.push(t);
+                }
+            });
+
+            // Desempate aleatório para evitar repetir a mesma ordem
+            return finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
         }
 
-        // --- Distribute Starters ---
-        // When using positional balance: distribute by position group first
+        // --- REGRA DE GOLEIROS (CORREÇÃO PROBLEMA 3) ---
+        // Identifica goleiros (seja na posição Principal ou Alternativa)
+        const goalkeepers = startersPool.filter(p => isGoleiro(p));
+        const fieldPlayers = startersPool.filter(p => !isGoleiro(p));
+
+        shuffleArray(goalkeepers);
+
+        // Distribui exatamente 1 goleiro para cada time enquanto houver goleiros/times
+        goalkeepers.forEach(gk => {
+            const emptyGkTeam = teams.find(t => !t.starters.some(p => isGoleiro(p)));
+            if (emptyGkTeam) {
+                emptyGkTeam.starters.push(gk);
+                emptyGkTeam.totalStarterScore += gk.rating;
+            } else {
+                fieldPlayers.push(gk); // Se sobrarem goleiros além do n° de times, entram no sorteio geral
+            }
+        });
+
+        // --- DISTRIBUIÇÃO DOS JOGADORES DE LINHA ---
         if (usePositional) {
-            // Group starters by primary position priority
-            sortPool(startersPool);
+            // Agrupa por posição primária
+            const posGroups = { 2: [], 3: [], 4: [], 5: [] };
+            fieldPlayers.forEach(p => {
+                const prio = getEffectivePrimaryPriority(p);
+                const group = prio === 1 ? 5 : prio; // Se era GOL secundário sobressalente, trata como geral
+                posGroups[group].push(p);
+            });
 
-            // Assign in waves: give one player per team (round-robin by priority group)
-            // to ensure each team gets 1 GOL if possible, then fill with DEF, MEI, ATA
-            const posGroups = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-            startersPool.forEach(p => posGroups[getEffectivePrimaryPriority(p)].push(p));
-
-            // Sort each group by rating desc
-            for (let k in posGroups) posGroups[k].sort((a, b) => b.rating - a.rating);
-
-            // For each priority group, distribute round-robin to the team with fewest starters (then weakest score)
-            [1, 2, 3, 4, 5].forEach(prio => {
+            // Para cada posição, ordena os melhores jogadores primeiro
+            [2, 3, 4, 5].forEach(prio => {
+                posGroups[prio].sort((a, b) => b.rating - a.rating);
                 posGroups[prio].forEach(player => {
-                    const target = findWeakestTeamByCount(teams, 'starters', 'totalStarterScore');
+                    const target = findWeakestTeamForStarter(teams);
                     target.starters.push(player);
                     target.totalStarterScore += player.rating;
                 });
             });
         } else {
-            sortPool(startersPool);
-            startersPool.forEach(player => {
-                const target = findWeakestTeamByCount(teams, 'starters', 'totalStarterScore');
+            // Se não usar posições, distribui por nível de força (cobra aos poucos)
+            fieldPlayers.sort((a, b) => b.rating - a.rating);
+            fieldPlayers.forEach(player => {
+                const target = findWeakestTeamForStarter(teams);
                 target.starters.push(player);
                 target.totalStarterScore += player.rating;
             });
         }
 
-        // --- Distribute Reserves (always by count then score) ---
-        sortPool(reservesPool);
+        // --- DISTRIBUIÇÃO DE RESERVAS ---
+        shuffleArray(reservesPool);
         reservesPool.forEach(player => {
-            const target = findWeakestTeamByCount(teams, 'reserves', 'totalReserveScore');
+            let target = teams[0];
+            for (let i = 1; i < teams.length; i++) {
+                if (teams[i].reserves.length < target.reserves.length) {
+                    target = teams[i];
+                } else if (teams[i].reserves.length === target.reserves.length && teams[i].totalReserveScore < target.totalReserveScore) {
+                    target = teams[i];
+                }
+            }
             target.reserves.push(player);
             target.totalReserveScore += player.rating;
         });
 
-        // --- Final sort within each team for display ---
-        teams.forEach(team => {
-            sortPool(team.starters);
-            sortPool(team.reserves);
-        });
-
-        // --- Fill remaining starter slots with filler players ---
+        // --- PREENCHIMENTO COM JOGADORES FICTÍCIOS (CORREÇÃO PROBLEMA 2) ---
+        // Aplicado SOMENTE NO FINAL, garantindo que o equilíbrio inicial não seja distorcido
         fillerIndex = 0;
         teams.forEach(team => {
             while (team.starters.length < limit && fillerIndex < FILLER_PLAYERS.length) {
@@ -848,7 +811,6 @@ document.addEventListener('DOMContentLoaded', () => {
         teams.forEach((team, index) => {
             const card = document.createElement('div');
             card.className = 'team-card';
-            const posNote = showPositions ? '' : '';
 
             card.innerHTML = `
                 <div class="team-header">
