@@ -256,7 +256,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    navManage.addEventListener('click', () => switchView('manage'));
+    navManage.addEventListener('click', () => {
+    const pwd = prompt('Digite a senha para acessar o elenco:');
+    if (pwd !== '010203') {
+        alert('Senha incorreta.');
+        return;
+    }
+    switchView('manage');
+});
     navDraw.addEventListener('click', () => switchView('draw'));
 
     // Navegação interna do Sorteio
@@ -473,13 +480,11 @@ document.addEventListener('DOMContentLoaded', () => {
         filtered.forEach(player => {
             const li = document.createElement('li');
             li.className = 'player-item';
-            const starsStr = '★'.repeat(player.rating);
             const posHtml = getPositionsHtml(player);
             li.innerHTML = `
                 <input type="checkbox" id="chk-${player.id}" data-id="${player.id}" ${player.selected ? 'checked' : ''}>
                 <label for="chk-${player.id}" class="player-info" style="cursor:pointer; width:100%;">
                     <span class="player-name">${player.name} ${posHtml}</span>
-                    <span class="player-rating">${starsStr}</span>
                 </label>`;
             selectPlayersListUl.appendChild(li);
         });
@@ -745,4 +750,5 @@ document.addEventListener('DOMContentLoaded', () => {
     showPositions = balancePositionsCheck.checked;
     initSquads();
     renderPlayers();
+    switchView('draw');
 });
