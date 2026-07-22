@@ -363,8 +363,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSquadSelect(squads, activeId);
     });
 
-    btnDeleteSquad.addEventListener('click', async () => {
-        const squads = await loadSquadsFromFirestore();
+   btnDeleteSquad.addEventListener('click', async () => {
+    const pwd = prompt('Digite a senha para acessar o elenco:');
+    if (pwd !== '010203') {
+        alert('Senha incorreta.');
+        return;
+    }
+    const squads = await loadSquadsFromFirestore();
         if (squads.length <= 1) {
             alert('Você precisa ter ao menos um elenco!');
             return;
