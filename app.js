@@ -351,9 +351,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSelectPlayersList();
     });
 
-    btnRenameSquad.addEventListener('click', async () => {
-        const activeId = getActiveSquadId();
-        const squads = await loadSquadsFromFirestore();
+   btnRenameSquad.addEventListener('click', async () => {
+    const pwd = prompt('Digite a senha para acessar o elenco:');
+    if (pwd !== '010203') {
+        alert('Senha incorreta.');
+        return;
+    }
+    const activeId = getActiveSquadId();
+    const squads = await loadSquadsFromFirestore();
         const squad = squads.find(s => s.id === activeId);
         if (!squad) return;
         const newName = prompt('Novo nome para o elenco:', squad.name);
