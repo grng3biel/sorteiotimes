@@ -656,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ===========================
-    // Draw Algorithm (Corrigido)
+    // Draw Algorithm (Equilíbrio Inteligente com Empréstimo)
     // ===========================
     btnDrawTeams.addEventListener('click', () => {
         const selected = players.filter(p => p.selected);
@@ -672,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const usePositional = balancePositionsCheck.checked;
         const totalStarterSlots = numTeams * limit;
 
-        // Embaralhar seleção inicial para não viciar resultados
+        // Embaralhar seleção inicial
         let pool = shuffleArray([...selected]);
 
         let startersPool = [];
@@ -691,22 +691,56 @@ document.addEventListener('DOMContentLoaded', () => {
             starters: [], reserves: [], totalStarterScore: 0, totalReserveScore: 0
         }));
 
-        // Função para encontrar o time que precisa de jogador
-        function findWeakestTeamForStarter(teamsArr) {
+        // 1. INJETAR OS FICTÍCIOS PRIMEIRO NAS VAGAS QUE FALTAM
+        // Assim o time incompleto já começa o sorteio com os +5 pontos da vaga do emprestado!
+        let missingSlots = totalStarterSlots - startersPool.length;
+        if (missingSlots > 0) {
+            fillerIndex = 0;
+            for (let i = 0; i < missingSlots; i++) {
+                const teamIdx = i % numTeams;
+                if (fillerIndex < FILLER_PLAYERS.length) {
+                    const filler = { ...FILLER_PLAYERS[fillerIndex] };
+                    teams[teamIdx].starters.push(filler);
+                    teams[teamIdx].totalStarterScore += filler.rating; // Injeta os 5 pontos no início
+                    fillerIndex++;
+                }
+            }
+        }
+
+        // 2. REGRA DE GOLEIROS
+        const goalkeepers = startersPool.filter(p => isGoleiro(p));
+        const fieldPlayers = startersPool.filter(p => !isGoleiro(p));
+
+        shuffleArray(goalkeepers);
+
+        goalkeepers.forEach(gk => {
+            const emptyGkTeam = teams.find(t => !t.starters.some(p => isGoleiro(p)));
+            if (emptyGkTeam) {
+                emptyGkTeam.starters.push(gk);
+                emptyGkTeam.totalStarterScore += gk.rating;
+            } else {
+                fieldPlayers.push(gk);
+            }
+        });
+
+        // Helper para escolher o time ideal a receber o próximo jogador
+        function findTargetTeamForStarter() {
             let candidates = [];
             let minCount = Infinity;
 
-            // Pega os times com menor número de titulares
-            teamsArr.forEach(t => {
-                if (t.starters.length < minCount) {
-                    minCount = t.starters.length;
-                    candidates = [t];
-                } else if (t.starters.length === minCount) {
-                    candidates.push(t);
+            // Busca times que ainda não atingiram o limite de vagas (considerando a vaga do fictício)
+            teams.forEach(t => {
+                if (t.starters.length < limit) {
+                    if (t.starters.length < minCount) {
+                        minCount = t.starters.length;
+                        candidates = [t];
+                    } else if (t.starters.length === minCount) {
+                        candidates.push(t);
+                    }
                 }
             });
 
-            // Entre eles, pega o de menor pontuação de força
+            // Entre os que têm menos gente, escolhe o que tem a MENOR FORÇA TOTAL no momento
             let minScore = Infinity;
             let finalCandidates = [];
             candidates.forEach(t => {
@@ -718,58 +752,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Desempate aleatório para evitar repetir a mesma ordem
             return finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
         }
 
-        // --- REGRA DE GOLEIROS (CORREÇÃO PROBLEMA 3) ---
-        // Identifica goleiros (seja na posição Principal ou Alternativa)
-        const goalkeepers = startersPool.filter(p => isGoleiro(p));
-        const fieldPlayers = startersPool.filter(p => !isGoleiro(p));
-
-        shuffleArray(goalkeepers);
-
-        // Distribui exatamente 1 goleiro para cada time enquanto houver goleiros/times
-        goalkeepers.forEach(gk => {
-            const emptyGkTeam = teams.find(t => !t.starters.some(p => isGoleiro(p)));
-            if (emptyGkTeam) {
-                emptyGkTeam.starters.push(gk);
-                emptyGkTeam.totalStarterScore += gk.rating;
-            } else {
-                fieldPlayers.push(gk); // Se sobrarem goleiros além do n° de times, entram no sorteio geral
-            }
-        });
-
-        // --- DISTRIBUIÇÃO DOS JOGADORES DE LINHA ---
+        // 3. DISTRIBUIÇÃO DOS JOGADORES DE LINHA
         if (usePositional) {
-            // Agrupa por posição primária
             const posGroups = { 2: [], 3: [], 4: [], 5: [] };
             fieldPlayers.forEach(p => {
                 const prio = getEffectivePrimaryPriority(p);
-                const group = prio === 1 ? 5 : prio; // Se era GOL secundário sobressalente, trata como geral
+                const group = prio === 1 ? 5 : prio;
                 posGroups[group].push(p);
             });
 
-            // Para cada posição, ordena os melhores jogadores primeiro
             [2, 3, 4, 5].forEach(prio => {
                 posGroups[prio].sort((a, b) => b.rating - a.rating);
                 posGroups[prio].forEach(player => {
-                    const target = findWeakestTeamForStarter(teams);
-                    target.starters.push(player);
-                    target.totalStarterScore += player.rating;
+                    const target = findTargetTeamForStarter();
+                    if (target) {
+                        target.starters.push(player);
+                        target.totalStarterScore += player.rating;
+                    }
                 });
             });
         } else {
-            // Se não usar posições, distribui por nível de força (cobra aos poucos)
             fieldPlayers.sort((a, b) => b.rating - a.rating);
             fieldPlayers.forEach(player => {
-                const target = findWeakestTeamForStarter(teams);
-                target.starters.push(player);
-                target.totalStarterScore += player.rating;
+                const target = findTargetTeamForStarter();
+                if (target) {
+                    target.starters.push(player);
+                    target.totalStarterScore += player.rating;
+                }
             });
         }
 
-        // --- DISTRIBUIÇÃO DE RESERVAS ---
+        // 4. DISTRIBUIÇÃO DE RESERVAS
         shuffleArray(reservesPool);
         reservesPool.forEach(player => {
             let target = teams[0];
@@ -784,16 +800,9 @@ document.addEventListener('DOMContentLoaded', () => {
             target.totalReserveScore += player.rating;
         });
 
-        // --- PREENCHIMENTO COM JOGADORES FICTÍCIOS (CORREÇÃO PROBLEMA 2) ---
-        // Aplicado SOMENTE NO FINAL, garantindo que o equilíbrio inicial não seja distorcido
-        fillerIndex = 0;
-        teams.forEach(team => {
-            while (team.starters.length < limit && fillerIndex < FILLER_PLAYERS.length) {
-                const filler = { ...FILLER_PLAYERS[fillerIndex] };
-                team.starters.push(filler);
-                team.totalStarterScore += filler.rating;
-                fillerIndex++;
-            }
+        // Move o fictício para o final da lista em cada time (apenas organização visual)
+        teams.forEach(t => {
+            t.starters.sort((a, b) => (a.isFiller ? 1 : 0) - (b.isFiller ? 1 : 0));
         });
 
         renderTeams(teams);
